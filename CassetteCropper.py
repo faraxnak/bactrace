@@ -8,6 +8,8 @@ import PIL
 from PIL import Image
 import cv2
 import SimpleITK as sitk
+import os.path
+
 
 class CassetteCropper():
     def __init__(self):
@@ -42,7 +44,12 @@ class CassetteCropper():
 
     def crop(self):
         sample_closed =  self._create_closed_image(self.sample)
-        template_closed = self._create_closed_image(self.template)
+        template_path = '/tmp/template_closed.png'
+        if os.path.isfile(template_path):
+            template_closed = imageio.imread(template_path).astype(np.bool)
+        else:
+            template_closed = self._create_closed_image(self.template)
+            imageio.imwrite(template_path, template_closed.astype(np.uint8) * 255)
         sample_registered = self._register_to_template(template_closed, sample_closed)
         return self._crop_to_box(sample_registered)
         
@@ -50,8 +57,8 @@ class CassetteCropper():
     def _create_closed_image(self, img):
         img_blur = ndimage.gaussian_filter(img, sigma=1)
         th = np.quantile(img_blur, 0.9)
-        sample_th = np.where(img_blur > th, img_blur - th, 0)
-        (img_sobel, _) = self._sobel_filters(img_blur.astype(np.float32))
+        img_threshold = np.where(img_blur > th, img_blur - th, 0)
+        (img_sobel, _) = self._sobel_filters(img_threshold.astype(np.float32))
 
         edge_threshold = 10
         _,thresh = cv2.threshold(img_sobel.astype(np.uint8),edge_threshold,255,0)
@@ -90,16 +97,13 @@ class CassetteCropper():
         R.SetInterpolator(sitk.sitkLinear)
         R.AddCommand( sitk.sitkIterationEvent, lambda: self._command_iteration(R) )
         outTx = R.Execute(fixed, moving)
-        return self._transform_sample(outTx)
+        return self._transform_sample(outTx, fixed)
 
-    def _transform_sample(self, outTx):
+    def _transform_sample(self, outTx, fixed):
         moving = sitk.GetImageFromArray(self.sample)
         moving = sitk.Normalize(moving)
         moving = sitk.DiscreteGaussian(moving, 2.0)
         resampler = sitk.ResampleImageFilter()
-        fixed = sitk.GetImageFromArray(self.template)
-        fixed = sitk.Normalize(fixed)
-        fixed = sitk.DiscreteGaussian(fixed, 2.0)
         resampler.SetReferenceImage(fixed)
         resampler.SetInterpolator(sitk.sitkLinear)
         resampler.SetDefaultPixelValue(1)
