@@ -6,3 +6,7 @@ data/
 \.DS_Store
 
 *.jpg
+
+\.vscode/
+
+__pycache__/
