@@ -43,11 +43,13 @@ class CassetteCropper():
         return (G, theta)
 
     def crop(self):
+        print('preprocessing sample image')
         sample_closed =  self._create_closed_image(self.sample)
         template_path = '/tmp/template_closed.png'
         if os.path.isfile(template_path):
             template_closed = imageio.imread(template_path).astype(np.bool)
         else:
+            print('preprocessing template image (only once)')
             template_closed = self._create_closed_image(self.template)
             imageio.imwrite(template_path, template_closed.astype(np.uint8) * 255)
         sample_registered = self._register_to_template(template_closed, sample_closed)
