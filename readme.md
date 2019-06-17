@@ -7,7 +7,23 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-`4_Pos_low Inflammation.tiff` was used as the template image. Pass the address of the sample image and template using `-s` and `-t` respectively. default values would be `/tmp/sample.tiff` and `/tmp/template.tiff` if not provided in the arguments. type `python3 bactrace.py -h` for help. sample usage:
+`4_Pos_low Inflammation.tiff` was used as the template image. User can pass these parameters to the program: 
+- Path to template image using `-t` (default: `/tmp/template.tiff`)
+- Path to sample image using `-s` (default: `/tmp/sample.tiff`)
+- Directory containing sample images using `-d` (default: `/tmp/samples/`). 
+
+If the directory is passed as an argument or the default directory exists, the sample path will be ignored. Only `tiff` images are read from the directory.
+
+sample usage:
 ```
-python3 bactrace.py -s data/samples/10_Pos_Inflammation_Low\ bact.tiff -t data/samples/4_Pos_low\ Inflammation.tiff
+python3 bactrace.py -s data/samples/10_Pos_Inflammation_Low bact.tiff -t data/samples/4_Pos_low Inflammation.tiff
 ```
+Or
+```
+python3 bactrace.py -t data/samples/4_Pos_low Inflammation.tiff -d data/samples/
+```
+User can stop the program using `Ctrl-C` from terminal or by closing the results window.
+
+## Results
+The results will be saved to `/tmp/results/{Data_Time}` folder (e.g. `/tmp/results/2019-06-16_21-31-14/`). For each running the program, there will be a new folder containing the original cropped images, marked images and a csv file with the measurements for all the samples in sample directory (or one sample passed using the sample pass argument).
+Measurements for the last image will be shown at the end.
