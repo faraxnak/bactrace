@@ -53,7 +53,7 @@ class MarkerReader():
             sample_cropped_marked_boxes = self._draw_box_border(sample_cropped_marked_boxes,
                                                     int(properties['left_ips'][1]) * bin_width + start_margin,
                                                     int(properties['right_ips'][1]) * bin_width + start_margin,
-                                                    "green")
+                                                    "orange")
         
 
         if test_1_val is not None:
@@ -75,13 +75,13 @@ class MarkerReader():
         
     def _draw_box_border(self, image, start, end, color):
         if color == "black":
-            color_array = [50,50,150]
+            color_array = [128,0,128]
         elif color == "red":
             color_array = [255,0,0]
-        elif color == "green":
-            color_array = [0,255,0]
+        elif color == "orange":
+            color_array = [255,165,0]
         elif color == "white":
-            color_array = [100,255,255]
+            color_array = [200,200,200]
         image[:,start:start+2,:] = color_array
         image[:,end:end+2,:] = color_array
         return image

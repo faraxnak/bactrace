@@ -12,6 +12,154 @@ import datetime
 from CassetteCropper import CassetteCropper
 from MarkerReader import MarkerReader
 
+class ResultViewer():
+    def __init__(self):
+        self.window = None
+
+    def create_window(self, title, cropped_sample, marked_image, markers_data, markers_p_value):        
+        ## generate window
+        window = Tk()
+        window.title("Bactrace")
+
+        self.title_stringVars = StringVar()
+        self.title_stringVars.set("Result for sample at {}".format(title))
+        self.title_label = Label(window, textvariable = self.title_stringVars)
+        self.title_label.grid(row = 0)
+
+        self.canvas_orig = Canvas(window, width = 400, height = 100)        
+        self.img_orig = ImageTk.PhotoImage(image=Image.fromarray(np.array(cropped_sample)))     
+        self.img_viewer_orig = self.canvas_orig.create_image(20,20, anchor=NW, image=self.img_orig)
+        self.canvas_orig.grid(row=1)
+
+        self.canvas = Canvas(window, width = 400, height = 100)        
+        self.img = ImageTk.PhotoImage(image=Image.fromarray(np.array(marked_image)))     
+        self.img_viewer = self.canvas.create_image(20,20, anchor=NW, image=self.img)
+        self.canvas.grid(row=2)
+
+        self.table_canvas = Canvas(window, width = 400, height = 200)
+        self.table_canvas.grid(row=3)
+        self.height = 4
+        self.width = 5    
+        # self.labels = []    
+        self.stringVars = []
+        for i in range(self.height):  # Rows
+            texts, fg = self.getTextForRow(i, markers_data, markers_p_value)
+            rows = []
+            for j in range(self.width):  # Columns
+                v = StringVar()                
+                rows.append(v)
+                b = Label(self.table_canvas, textvariable=v, fg = fg)
+                # b.pack()                
+                b.grid(row=i, column=j)                                
+                v.set(texts[j])
+            self.stringVars.append(rows)
+        self.window = window            
+        return window
+    def update(self, title, cropped_sample, marked_image, markers_data, markers_p_value):              
+        self.title_stringVars.set("Result for sample at {}".format(title))
+        self.img_orig = ImageTk.PhotoImage(image=Image.fromarray(np.array(cropped_sample)))
+        self.canvas_orig.itemconfig(self.img_viewer_orig, image = self.img_orig)
+        self.img = ImageTk.PhotoImage(image=Image.fromarray(np.array(marked_image)))
+        self.canvas.itemconfig(self.img_viewer, image = self.img)
+        for i in range(self.height):  # Rows
+            texts, _ = self.getTextForRow(i, markers_data, markers_p_value)
+            for j in range(self.width):  # Columns
+                self.stringVars[i][j].set(texts[j])
+        pass
+
+    def getTextForRow(self, i, markers_data, markers_p_value):
+        fg = "black"
+        if i == 0:
+            texts = ['Type' ,'Intensity', 'P_Value', 'Ratio', 'Decision']
+        elif i == 1:
+            texts = ['Control', '{}'.format(markers_data[0]), '{}'.format(markers_p_value[0]), '1', '']
+            fg = "purple"
+        elif i == 2:
+            texts = ['Test 1', '{}'.format(markers_data[1]), '{}'.format(markers_p_value[1]), '{:.2f}'.format(markers_data[1]/markers_data[0]) ,'']
+            fg = "red"
+        elif i == 3:
+            texts = ['Test 2', '{}'.format(markers_data[2]), '{}'.format(markers_p_value[2]), '{:.2f}'.format(markers_data[2]/markers_data[0]) ,'']
+            fg = "orange"
+        return texts, fg
+
+def readImages(can_be_empty = False):
+    samples = []
+    filenames = []
+    source_pathes = []
+    if reading_from_folder == True:
+        for file in os.listdir(args.sample_dir):
+            if file.endswith(".tiff"):
+                filename = args.sample_dir + file
+                samples.append(Image.open(filename))
+                filenames.append(file)
+                source_pathes.append(args.sample_dir + file)
+        if len(samples) == 0:
+            if not can_be_empty:
+                sys.exit('Did not find any tiff images in {}'.format(args.sample_dir))
+    else:
+        source_pathes.append(args.sample_path)
+        filenames = [args.sample_path.split("/")[-1]]
+        samples.append(Image.open(args.sample_path))
+    return samples, filenames, source_pathes
+
+def process_images(samples, filenames):
+    cropped_images = []
+    marked_images = []
+    markers_data_list = []
+    markers_p_value_list = []
+    cropper = CassetteCropper()
+    markerReader = MarkerReader()
+    for sample, filename in zip(samples, filenames):    
+        print('started processing {}'.format(filename))
+        cropper.set_images(sample, template)
+        cropped_sample = cropper.crop()
+        cropped_images.append(cropped_sample)    
+        marked_image, markers_data, markers_p_value = markerReader.read_markers(cropped_sample)
+        marked_images.append(marked_image)
+        markers_data_list.append(markers_data)
+        markers_p_value_list.append(markers_p_value)
+    return cropped_images, marked_images, markers_data_list, markers_p_value_list
+
+"""
+Saving result (CSV and processed image)
+"""
+def save_resutls(cropped_images, marked_images, markers_data_list,
+                 markers_p_value_list, filenames, source_pathes,
+                 input_folder, cropped_folder, marked_folder, current_run_folder):
+    header = ['Filename', 'Control Intensity', 'Test 1 Intensity', 'P_Value', 'Ratio',  'Test 2 Intensity', 'P_Value', 'Ratio']
+    csv_file_path = current_run_folder + '/output.csv'
+    if not os.path.isfile(csv_file_path):
+        with open(csv_file_path, 'w') as csvFile:
+            writer = csv.writer(csvFile)
+            writer.writerow(header)
+            csvFile.close()
+    with open(csv_file_path, 'a+') as csvFile:
+        writer = csv.writer(csvFile)
+        for filename, markers_data, markers_p_value in zip(filenames, markers_data_list, markers_p_value_list):
+            r1 = '{:.2f}'.format(markers_data[1]/markers_data[0])
+            r2 = '{:.2f}'.format(markers_data[2]/markers_data[0])
+            row = ([filename, 
+                    '{}'.format(markers_data[0]), 
+                    '{}'.format(markers_data[1]), 
+                    '{}'.format(markers_p_value[1]), 
+                    r1,
+                    '{}'.format(markers_data[2]),
+                    '{}'.format(markers_p_value[2]), 
+                    r2])
+            writer.writerow(row)
+        csvFile.close()
+
+    for source_path, filename in zip(source_pathes, filenames):
+        if os.path.isfile(source_path):
+            os.rename(source_path, input_folder + filename) 
+    
+    for filename, cropped_image, marked_image in zip(filenames, cropped_images, marked_images):
+        image = Image.fromarray((cropped_image).astype(np.uint8))
+        image.save(cropped_folder + filename)
+        image = Image.fromarray((marked_image).astype(np.uint8))
+        image.save(marked_folder + filename)
+
+
 parser = ArgumentParser()
 parser.add_argument("-s", "--sample", dest="sample_path",
                     help="sample path", metavar="FILE", default='/tmp/sample.tiff')
@@ -42,128 +190,60 @@ if os.path.isfile(args.template_path) == False:
 #     sys.exit('Can not find the source image')
 
 template = Image.open(args.template_path)
-# sample_name = '6_Pos_Inflammation.tiff'
-# sample_name = '3_Pos_Inflammation.tiff'
-# sample_name = '5_Pos_low Inflammation.tiff'
-# sample_name = '7_neg.tiff'
-# sample_name = '8_Pos_Inflammation_suboptimal run.tiff'
-# tmp2 = '/Users/farid/Documents/Workspace/python/bactrace/data/samples/' + sample_name
-samples = []
 
-filenames = []
-if reading_from_folder == True:
-    for file in os.listdir(args.sample_dir):
-        if file.endswith(".tiff"):
-            filename = args.sample_dir + file
-            samples.append(Image.open(filename))
-            filenames.append(file)
-    if len(samples) == 0:
-        sys.exit('Did not find any tiff images in {}'.format(args.sample_dir))
-else:
-    filenames = [args.sample_path.split("/")[-1]]
-    samples.append(Image.open(args.sample_path))
 
-cropped_images = []
-marked_images = []
-markers_data_list = []
-markers_p_value_list = []
-cropper = CassetteCropper()
-markerReader = MarkerReader()
-for sample in samples:    
-    cropper.set_images(sample, template)
-    cropped_sample = cropper.crop()
-    cropped_images.append(cropped_sample)    
-    marked_image, markers_data, markers_p_value = markerReader.read_markers(cropped_sample)
-    marked_images.append(marked_image)
-    markers_data_list.append(markers_data)
-    markers_p_value_list.append(markers_p_value)
 
-"""
-Saving result (CSV and processed image)
-"""
+samples, filenames, source_pathes = readImages()
+cropped_images, marked_images, markers_data_list, markers_p_value_list = process_images(samples, filenames)
 
-results_folder = "/tmp/results/"
-if not os.path.isdir(results_folder):
-    os.mkdir(results_folder)
+def create_folders():
+    results_folder = "/tmp/results/"
+    if not os.path.isdir(results_folder):
+        os.mkdir(results_folder)
 
-current_run_folder = results_folder + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-if not os.path.isdir(current_run_folder):
-    os.mkdir(current_run_folder)
+    current_run_folder = results_folder + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    if not os.path.isdir(current_run_folder):
+        os.mkdir(current_run_folder)
+    
+    input_folder = current_run_folder + "/input/"
+    os.mkdir(input_folder)
+    cropped_folder = current_run_folder + "/cropped/"
+    os.mkdir(cropped_folder)
+    marked_folder = current_run_folder + "/processed/"
+    os.mkdir(marked_folder)
 
-header = ['Filename', 'Control Intensity', 'Test 1 Intensity', 'P_Value', 'Ratio',  'Test 2 Intensity', 'P_Value', 'Ratio']
-with open(current_run_folder + '/output.csv', 'w') as csvFile:
-    writer = csv.writer(csvFile)
-    writer.writerow(header)
-    for filename, markers_data, markers_p_value in zip(filenames, markers_data_list, markers_p_value_list):
-        r1 = '{:.2f}'.format(markers_data[1]/markers_data[0])
-        r2 = '{:.2f}'.format(markers_data[2]/markers_data[0])
-        row = ([filename, 
-                '{}'.format(markers_data[0]), 
-                '{}'.format(markers_data[1]), 
-                '{}'.format(markers_p_value[1]), 
-                r1,
-                '{}'.format(markers_data[2]),
-                '{}'.format(markers_p_value[2]), 
-                r2])
-        writer.writerow(row)
-    csvFile.close()
+    return current_run_folder, input_folder, cropped_folder, marked_folder
 
-cropped_folder = current_run_folder + "/cropped/"
-os.mkdir(cropped_folder)
-marked_folder = current_run_folder + "/processed/"
-os.mkdir(marked_folder)
-for filename, cropped_image, marked_image in zip(filenames, cropped_images, marked_images):
-    image = Image.fromarray((cropped_image).astype(np.uint8))
-    image.save(cropped_folder + filename)
-    image = Image.fromarray((marked_image).astype(np.uint8))
-    image.save(marked_folder + filename)
+current_run_folder, input_folder, cropped_folder, marked_folder = create_folders() 
+save_resutls(cropped_images, marked_images, markers_data_list, 
+            markers_p_value_list, filenames, source_pathes,
+            input_folder, cropped_folder, marked_folder, current_run_folder)
 
 """
 Showing the result
 """
+viewer = ResultViewer()
+window = viewer.create_window(filenames[-1], cropped_images[-1], 
+                        marked_images[-1], markers_data_list[-1], markers_p_value_list[-1])
 
-window = Tk()
-window.title("Bactrace")
+def check():    
+    samples, filenames, source_pathes = readImages(can_be_empty=True)    
+    if len(samples) > 0:
+        cropped_images, marked_images, markers_data_list, markers_p_value_list = process_images(samples, filenames)
+        save_resutls(cropped_images, marked_images, markers_data_list, 
+                    markers_p_value_list, filenames, source_pathes,
+                    input_folder, cropped_folder, marked_folder, current_run_folder)
+        viewer.update(filenames[-1], cropped_images[-1], 
+                        marked_images[-1], markers_data_list[-1], markers_p_value_list[-1])
+        window.after(int(1e3), check)
+    else:
+        window.after(int(1e3), check)
 
-Label(window, text = "Result for sample at {}".format(args.sample_path)).grid(row = 0) # this is placed in 0 0
+def ctrl_c_check():
+    window.after(10, ctrl_c_check)
 
-canvas_orig = Canvas(window, width = 400, height = 100)
-canvas_orig.grid(row=1)
-img_orig = ImageTk.PhotoImage(image=Image.fromarray(np.array(cropped_sample)))     
-img_viewer = canvas_orig.create_image(20,20, anchor=NW, image=img_orig) 
-
-canvas = Canvas(window, width = 400, height = 100)
-canvas.grid(row=2)
-img = ImageTk.PhotoImage(image=Image.fromarray(np.array(marked_image)))     
-img_viewer = canvas.create_image(20,20, anchor=NW, image=img) 
-
-# canvas.place(relx=0.5, rely=0.5, anchor=CENTER)
-
-table_canvas = Canvas(window, width = 400, height = 200)
-table_canvas.grid(row=3)
-height = 4
-width = 5
-for i in range(height):  # Rows
-    fg = "black"
-    if i == 0:
-        texts = ['Type' ,'Intensity', 'P_Value', 'Ratio', 'Decision']
-    elif i == 1:
-        texts = ['Control', '{}'.format(markers_data[0]), '{}'.format(markers_p_value[0]), '1', '']
-    elif i == 2:
-        texts = ['Test 1', '{}'.format(markers_data[1]), '{}'.format(markers_p_value[1]), '{:.2f}'.format(markers_data[1]/markers_data[0]) ,'']
-        fg = "red"
-    elif i == 3:
-        texts = ['Test 2', '{}'.format(markers_data[2]), '{}'.format(markers_p_value[2]), '{:.2f}'.format(markers_data[2]/markers_data[0]) ,'']
-        fg = "green"
-
-    for j in range(width):  # Columns
-        b = Label(table_canvas, text=texts[j], fg = fg)
-        b.grid(row=i, column=j)
-
-def check():
-    window.after(50, check)
-
-window.after(50, check)
+window.after(int(1e4), check)
+window.after(10, ctrl_c_check)
 try:
     window.mainloop()
 except KeyboardInterrupt:
