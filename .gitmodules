@@ -1,0 +1,3 @@
+[submodule "imreg_dft"]
+	path = imreg_dft
+	url = https://github.com/matejak/imreg_dft
