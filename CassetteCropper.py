@@ -9,7 +9,7 @@ from PIL import Image
 import cv2
 import SimpleITK as sitk
 import os.path
-
+import imreg_dft as ird
 
 class CassetteCropper():
     def __init__(self):
@@ -52,7 +52,8 @@ class CassetteCropper():
             print('preprocessing template image (only once)')
             template_closed = self._create_closed_image(self.template)
             imageio.imwrite(template_path, template_closed.astype(np.uint8) * 255)
-        sample_registered = self._register_to_template(template_closed, sample_closed)
+        # sample_registered = self._register_to_template(template_closed, sample_closed)
+        sample_registered = self._register_to_template_2(template_closed, sample_closed)
         return self._crop_to_box(sample_registered)
         
 
@@ -74,6 +75,34 @@ class CassetteCropper():
         print("{0:3} = {1:7.5f} : {2}".format(method.GetOptimizerIteration(),
                                            method.GetMetricValue(),
                                            method.GetOptimizerPosition()))
+
+    
+    def _register_to_template_2(self, template_closed, sample_closed):
+        # fixed = sitk.GetImageFromArray(template_closed.astype(np.float) * 255)
+        # fixed = sitk.DiscreteGaussian(fixed, 2.0)
+
+        # moving = sitk.GetImageFromArray(sample_closed.astype(np.float) * 255)
+        # moving = sitk.DiscreteGaussian(moving, 2.0)
+        im0 = template_closed.astype(np.uint8)
+        im1 = sample_closed.astype(np.uint8)
+        # using imreg_dft 
+        # result = ird.similarity(im0, im1, numiter=2, constraints=None)
+        constraints = {}
+        constraints['scale'] = [1,0.1]
+        # result = ird.similarity(im0, im1, numiter=2, constraints=constraints)
+
+        constraints['angle'] = [0,4]
+        constraints['tx'] = [0,5]
+        constraints['ty'] = [0,5]
+        result = ird.similarity(im0, im1, numiter=2, constraints=constraints)
+
+        assert "timg" in result
+        # Maybe we don't want to show plots all the time
+        # if os.environ.get("IMSHOW", "yes") == "yes":
+        #     import matplotlib.pyplot as plt
+        #     ird.imshow(im0, im1, result['timg'])
+        #     plt.show()
+        return self._transform_sample_2(result)
 
     def _register_to_template(self, template_closed, sample_closed):
         fixed = sitk.GetImageFromArray(template_closed.astype(np.float) * 255)
@@ -101,6 +130,14 @@ class CassetteCropper():
         outTx = R.Execute(fixed, moving)
         return self._transform_sample(outTx, fixed)
 
+    def _transform_sample_2(self, result):
+        sample_registered = ird.imreg.transform_img(self.sample, scale=result['scale'], angle=result['angle'], tvec=result['tvec'])
+        sample_registered = sample_registered.astype(np.uint8)
+        # if os.environ.get("IMSHOW", "yes") == "yes":
+        #     import matplotlib.pyplot as plt
+        #     ird.imshow(self.template, self.sample, sample_registered)
+        #     plt.show()
+        return sample_registered
     def _transform_sample(self, outTx, fixed):
         moving = sitk.GetImageFromArray(self.sample)
         moving = sitk.Normalize(moving)
@@ -123,6 +160,6 @@ class CassetteCropper():
 
     def _crop_to_box(self, sample_registered):
         # cropping mask based on the template image
-        x1 = 270/2; x2 = 900/2; y1 = 360/2; y2 = 500/2
+        x1 = 270/2; x2 = 900/2; y1 = 360/2; y2 = 520/2
         sample_cropped = sample_registered[int(y1):int(y2), int(x1):int(x2)]
         return sample_cropped
