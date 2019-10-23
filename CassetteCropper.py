@@ -91,7 +91,7 @@ class CassetteCropper():
         constraints['scale'] = [1,0.1]
         # result = ird.similarity(im0, im1, numiter=2, constraints=constraints)
 
-        constraints['angle'] = [0,4]
+        constraints['angle'] = [0,1]
         constraints['tx'] = [0,5]
         constraints['ty'] = [0,5]
         result = ird.similarity(im0, im1, numiter=2, constraints=constraints)
@@ -160,6 +160,8 @@ class CassetteCropper():
 
     def _crop_to_box(self, sample_registered):
         # cropping mask based on the template image
-        x1 = 270/2; x2 = 900/2; y1 = 360/2; y2 = 520/2
+        # x1 = 270/2; x2 = 900/2; y1 = 360/2; y2 = 520/2
+        # x1 = 200/2; x2 = 1400/2; y1 = 400/2; y2 = 800/2
+        x1 = 40/2; x2 = 1400/2; y1 = 360/2; y2 = 660/2
         sample_cropped = sample_registered[int(y1):int(y2), int(x1):int(x2)]
         return sample_cropped

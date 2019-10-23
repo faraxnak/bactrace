@@ -25,13 +25,14 @@ class ResultViewer():
         self.title_stringVars.set("Result for sample at {}".format(title))
         self.title_label = Label(window, textvariable = self.title_stringVars)
         self.title_label.grid(row = 0)
-
-        self.canvas_orig = Canvas(window, width = 400, height = 100)        
+        w = 700
+        h = 200
+        self.canvas_orig = Canvas(window, width = w, height = h)        
         self.img_orig = ImageTk.PhotoImage(image=Image.fromarray(np.array(cropped_sample)))     
         self.img_viewer_orig = self.canvas_orig.create_image(20,20, anchor=NW, image=self.img_orig)
         self.canvas_orig.grid(row=1)
 
-        self.canvas = Canvas(window, width = 400, height = 100)        
+        self.canvas = Canvas(window, width = w, height = h)        
         self.img = ImageTk.PhotoImage(image=Image.fromarray(np.array(marked_image)))     
         self.img_viewer = self.canvas.create_image(20,20, anchor=NW, image=self.img)
         self.canvas.grid(row=2)
@@ -90,7 +91,7 @@ def readImages(can_be_empty = False):
         for file in os.listdir(args.sample_dir):
             if file.endswith(".tiff"):
                 filename = args.sample_dir + file
-                samples.append(Image.open(filename))
+                samples.append(Image.open(filename).convert('L'))
                 filenames.append(file)
                 source_pathes.append(args.sample_dir + file)
         if len(samples) == 0:
@@ -99,7 +100,7 @@ def readImages(can_be_empty = False):
     else:
         source_pathes.append(args.sample_path)
         filenames = [args.sample_path.split("/")[-1]]
-        samples.append(Image.open(args.sample_path))
+        samples.append(Image.open(args.sample_path).convert('L'))
     return samples, filenames, source_pathes
 
 def process_images(samples, filenames):
@@ -189,7 +190,7 @@ if os.path.isfile(args.template_path) == False:
 # if os.path.isfile(args.sample_path) == False:
 #     sys.exit('Can not find the source image')
 
-template = Image.open(args.template_path)
+template = Image.open(args.template_path).convert('L')
 
 
 
