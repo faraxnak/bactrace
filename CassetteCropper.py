@@ -7,7 +7,7 @@ import numpy as np
 import PIL
 from PIL import Image
 import cv2
-import SimpleITK as sitk
+# import SimpleITK as sitk
 import os.path
 import imreg_dft as ird
 
@@ -104,31 +104,31 @@ class CassetteCropper():
         #     plt.show()
         return self._transform_sample_2(result)
 
-    def _register_to_template(self, template_closed, sample_closed):
-        fixed = sitk.GetImageFromArray(template_closed.astype(np.float) * 255)
-        fixed = sitk.DiscreteGaussian(fixed, 2.0)
+    # def _register_to_template(self, template_closed, sample_closed):
+    #     fixed = sitk.GetImageFromArray(template_closed.astype(np.float) * 255)
+    #     fixed = sitk.DiscreteGaussian(fixed, 2.0)
 
-        moving = sitk.GetImageFromArray(sample_closed.astype(np.float) * 255)
-        moving = sitk.DiscreteGaussian(moving, 2.0)
+    #     moving = sitk.GetImageFromArray(sample_closed.astype(np.float) * 255)
+    #     moving = sitk.DiscreteGaussian(moving, 2.0)
         
-        R = sitk.ImageRegistrationMethod()
-        R.SetMetricAsMeanSquares()
-        sample_per_axis=100
-        tx = sitk.Euler2DTransform()
-        # Set the number of samples (radius) in each dimension, with a
-        # default step size of 1.0
-        R.SetOptimizerAsExhaustive([sample_per_axis//2,0,0])
-        # Utilize the scale to set the step size for each dimension
-        R.SetOptimizerScales([2.0*np.pi/sample_per_axis, 1.0,1.0])
+    #     R = sitk.ImageRegistrationMethod()
+    #     R.SetMetricAsMeanSquares()
+    #     sample_per_axis=100
+    #     tx = sitk.Euler2DTransform()
+    #     # Set the number of samples (radius) in each dimension, with a
+    #     # default step size of 1.0
+    #     R.SetOptimizerAsExhaustive([sample_per_axis//2,0,0])
+    #     # Utilize the scale to set the step size for each dimension
+    #     R.SetOptimizerScales([2.0*np.pi/sample_per_axis, 1.0,1.0])
 
-        # Initialize the transform with a translation and the center of
-        # rotation from the moments of intensity.
-        tx = sitk.CenteredTransformInitializer(fixed, moving, tx)
-        R.SetInitialTransform(tx)
-        R.SetInterpolator(sitk.sitkLinear)
-        R.AddCommand( sitk.sitkIterationEvent, lambda: self._command_iteration(R) )
-        outTx = R.Execute(fixed, moving)
-        return self._transform_sample(outTx, fixed)
+    #     # Initialize the transform with a translation and the center of
+    #     # rotation from the moments of intensity.
+    #     tx = sitk.CenteredTransformInitializer(fixed, moving, tx)
+    #     R.SetInitialTransform(tx)
+    #     R.SetInterpolator(sitk.sitkLinear)
+    #     R.AddCommand( sitk.sitkIterationEvent, lambda: self._command_iteration(R) )
+    #     outTx = R.Execute(fixed, moving)
+    #     return self._transform_sample(outTx, fixed)
 
     def _transform_sample_2(self, result):
         sample_registered = ird.imreg.transform_img(self.sample, scale=result['scale'], angle=result['angle'], tvec=result['tvec'])
@@ -138,25 +138,26 @@ class CassetteCropper():
         #     ird.imshow(self.template, self.sample, sample_registered)
         #     plt.show()
         return sample_registered
-    def _transform_sample(self, outTx, fixed):
-        moving = sitk.GetImageFromArray(self.sample)
-        moving = sitk.Normalize(moving)
-        moving = sitk.DiscreteGaussian(moving, 2.0)
-        resampler = sitk.ResampleImageFilter()
-        resampler.SetReferenceImage(fixed)
-        resampler.SetInterpolator(sitk.sitkLinear)
-        resampler.SetDefaultPixelValue(1)
-        resampler.SetTransform(outTx)
-        out = resampler.Execute(moving)
-        simg2 = sitk.Cast(sitk.RescaleIntensity(out), sitk.sitkUInt8)
-        sample_registered = sitk.GetArrayFromImage(simg2)
 
-        # simg1 = sitk.Cast(sitk.RescaleIntensity(fixed), sitk.sitkUInt8)
-        # simg2 = sitk.Cast(sitk.RescaleIntensity(out), sitk.sitkUInt8)        
-        # cimg = sitk.Compose(simg1, simg2, simg1//2.+simg2//2.)
-        # plt.imshow(sitk.GetArrayFromImage(cimg))
-        # plt.show()
-        return sample_registered
+    # def _transform_sample(self, outTx, fixed):
+    #     moving = sitk.GetImageFromArray(self.sample)
+    #     moving = sitk.Normalize(moving)
+    #     moving = sitk.DiscreteGaussian(moving, 2.0)
+    #     resampler = sitk.ResampleImageFilter()
+    #     resampler.SetReferenceImage(fixed)
+    #     resampler.SetInterpolator(sitk.sitkLinear)
+    #     resampler.SetDefaultPixelValue(1)
+    #     resampler.SetTransform(outTx)
+    #     out = resampler.Execute(moving)
+    #     simg2 = sitk.Cast(sitk.RescaleIntensity(out), sitk.sitkUInt8)
+    #     sample_registered = sitk.GetArrayFromImage(simg2)
+
+    #     # simg1 = sitk.Cast(sitk.RescaleIntensity(fixed), sitk.sitkUInt8)
+    #     # simg2 = sitk.Cast(sitk.RescaleIntensity(out), sitk.sitkUInt8)        
+    #     # cimg = sitk.Compose(simg1, simg2, simg1//2.+simg2//2.)
+    #     # plt.imshow(sitk.GetArrayFromImage(cimg))
+    #     # plt.show()
+    #     return sample_registered
 
     def _crop_to_box(self, sample_registered):
         # cropping mask based on the template image

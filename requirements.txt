@@ -4,5 +4,6 @@ imageio
 matplotlib
 numpy
 opencv-python
-SimpleITK
+# SimpleITK
 Pillow
+imreg-dft
