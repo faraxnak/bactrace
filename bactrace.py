@@ -39,7 +39,7 @@ class ResultViewer():
 
         self.table_canvas = Canvas(window, width = 400, height = 200)
         self.table_canvas.grid(row=3)
-        self.height = 4
+        self.height = 5
         self.width = 5    
         # self.labels = []    
         self.stringVars = []
@@ -81,6 +81,9 @@ class ResultViewer():
         elif i == 3:
             texts = ['Test 2', '{}'.format(markers_data[2]), '{}'.format(markers_p_value[2]), '{:.2f}'.format(markers_data[2]/markers_data[0]) ,'']
             fg = "orange"
+        elif i == 4:
+            texts = ['Test 3', '{}'.format(markers_data[3]), '{}'.format(markers_p_value[3]), '{:.2f}'.format(markers_data[3]/markers_data[0]) ,'']
+            fg = "cyan4"
         return texts, fg
 
 def readImages(can_be_empty = False):
@@ -127,7 +130,10 @@ Saving result (CSV and processed image)
 def save_resutls(cropped_images, marked_images, markers_data_list,
                  markers_p_value_list, filenames, source_pathes,
                  input_folder, cropped_folder, marked_folder, current_run_folder):
-    header = ['Filename', 'Control Intensity', 'Test 1 Intensity', 'P_Value', 'Ratio',  'Test 2 Intensity', 'P_Value', 'Ratio']
+    header = ['Filename', 'Control Intensity', 
+            'Test 1 Intensity', 'P_Value', 'Ratio', 
+            'Test 2 Intensity', 'P_Value', 'Ratio',
+            'Test 3 Intensity', 'P_Value', 'Ratio']
     csv_file_path = current_run_folder + '/output.csv'
     if not os.path.isfile(csv_file_path):
         with open(csv_file_path, 'w') as csvFile:
@@ -139,6 +145,7 @@ def save_resutls(cropped_images, marked_images, markers_data_list,
         for filename, markers_data, markers_p_value in zip(filenames, markers_data_list, markers_p_value_list):
             r1 = '{:.2f}'.format(markers_data[1]/markers_data[0])
             r2 = '{:.2f}'.format(markers_data[2]/markers_data[0])
+            r3 = '{:.2f}'.format(markers_data[3]/markers_data[0])
             row = ([filename, 
                     '{}'.format(markers_data[0]), 
                     '{}'.format(markers_data[1]), 
@@ -146,7 +153,10 @@ def save_resutls(cropped_images, marked_images, markers_data_list,
                     r1,
                     '{}'.format(markers_data[2]),
                     '{}'.format(markers_p_value[2]), 
-                    r2])
+                    r2,
+                    '{}'.format(markers_data[3]),
+                    '{}'.format(markers_p_value[3]), 
+                    r3])
             writer.writerow(row)
         csvFile.close()
 

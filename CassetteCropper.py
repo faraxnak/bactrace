@@ -59,7 +59,7 @@ class CassetteCropper():
 
     def _create_closed_image(self, img):
         img_blur = ndimage.gaussian_filter(img, sigma=1)
-        th = np.quantile(img_blur, 0.9)
+        th = np.quantile(img_blur, 0.6)
         img_threshold = np.where(img_blur > th, img_blur - th, 0)
         (img_sobel, _) = self._sobel_filters(img_threshold.astype(np.float32))
 
@@ -88,7 +88,7 @@ class CassetteCropper():
         # using imreg_dft 
         # result = ird.similarity(im0, im1, numiter=2, constraints=None)
         constraints = {}
-        constraints['scale'] = [1,0.1]
+        constraints['scale'] = [1,0.0]
         # result = ird.similarity(im0, im1, numiter=2, constraints=constraints)
 
         constraints['angle'] = [0,1]
@@ -163,6 +163,6 @@ class CassetteCropper():
         # cropping mask based on the template image
         # x1 = 270/2; x2 = 900/2; y1 = 360/2; y2 = 520/2
         # x1 = 200/2; x2 = 1400/2; y1 = 400/2; y2 = 800/2
-        x1 = 40/2; x2 = 1400/2; y1 = 360/2; y2 = 660/2
+        x1 = 10/2; x2 = 1240/2; y1 = 360/2; y2 = 660/2
         sample_cropped = sample_registered[int(y1):int(y2), int(x1):int(x2)]
         return sample_cropped
