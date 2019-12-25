@@ -11,9 +11,14 @@ import cv2
 import os.path
 import imreg_dft as ird
 
+from scipy.signal import find_peaks
+
 class CassetteCropper():
     def __init__(self):
         self.img_size = (int(1280/2), int(960/2))
+
+        self.CASSETTE_WIDTH = 1240/2
+        self.CASSETTE_HEIGHT = 300/2
         
 
     def set_images(self, sample, template):
@@ -43,6 +48,10 @@ class CassetteCropper():
         return (G, theta)
 
     def crop(self):
+        cassette = self.crop_translation_only()
+        if cassette is not None:
+            return cassette
+        # if didn't find with first method continue with registration
         print('preprocessing sample image')
         sample_closed =  self._create_closed_image(self.sample)
         template_path = '/tmp/template_closed.png'
@@ -56,6 +65,56 @@ class CassetteCropper():
         sample_registered = self._register_to_template_2(template_closed, sample_closed)
         return self._crop_to_box(sample_registered)
         
+    def crop_translation_only(self):
+        # calculate the median over horizontal lines
+        avg = np.mean(self.sample, axis=1)
+        v_center = self._find_main_peak(avg)
+        h_center = self.img_size[0]/2
+        # avg = np.mean(self.sample, axis=0)
+        # h_center = self._find_main_peak(avg)
+        if not h_center or not v_center:
+            return None
+        print(h_center, v_center)
+        cassette = self._crop_cassette_with_center(h_center, v_center)
+        return cassette
+        
+    def _crop_cassette_with_center(self, h_center, v_center):
+        h_index = [int(h_center - self.CASSETTE_WIDTH/2), int(h_center + self.CASSETTE_WIDTH/2)]
+        if h_index[0] < 0:
+            h_index[0] = 0
+            h_index[1] = self.CASSETTE_WIDTH
+        elif h_index[1] >= self.img_size[0]:
+            h_index[1] = self.img_size[0] - 1
+            h_index[0] = self.img_size[0] - self.CASSETTE_WIDTH - 1
+        h_index = self._check_index(h_center, self.CASSETTE_WIDTH, self.img_size[0])
+        v_index = self._check_index(v_center, self.CASSETTE_HEIGHT, self.img_size[1])
+        cassette = self.sample[v_index[0]:v_index[1], h_index[0]:h_index[1]]
+        return cassette
+
+    def _check_index(self, center, size, img_size):
+        h_index = [int(center) - size/2, int(center) + size/2 - 1]
+        if h_index[0] < 0:
+            h_index[0] = 0
+            h_index[1] = size
+        elif h_index[1] >= img_size:
+            h_index[1] = img_size - 1
+            h_index[0] = img_size - size - 1
+        return [int(h_index[0]), int(h_index[1])]
+
+    def _find_main_peak(self, avg, min_width = 100):
+        peaks_loc, properties = find_peaks(avg, height=0, prominence=20, width=min_width, distance=30)
+        if len(peaks_loc) == 1:
+            return int((properties['left_ips'][0] + properties['right_ips'][0])/2)
+        elif len(peaks_loc) == 0:
+            return None
+        else:            
+            main_loc = None
+            main_height = 0
+            for i, (peaks_loc) in enumerate(peaks_loc):
+                if properties['peak_heights'][i] > main_height:
+                    main_loc = int((properties['left_ips'][i] + properties['right_ips'][i])/2)
+                    main_height = properties['peak_heights'][i]
+            return main_loc
 
     def _create_closed_image(self, img):
         img_blur = ndimage.gaussian_filter(img, sigma=1)
