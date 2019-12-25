@@ -21,18 +21,12 @@ class CassetteCropper():
         self.CASSETTE_HEIGHT = 300/2
         
 
-    def set_images(self, sample, template):
+    def set_images(self, sample):
         tmp = sample
         tmp = tmp.resize(self.img_size, PIL.Image.ANTIALIAS)
         tmp = np.array(tmp)
         tmp = ndimage.median_filter(tmp, 5)
         self.sample = np.array(tmp)
-
-        tmp = template
-        tmp = tmp.resize(self.img_size, PIL.Image.ANTIALIAS)
-        tmp = np.array(tmp)
-        tmp = ndimage.median_filter(tmp, 5)
-        self.template = np.array(tmp)
 
     def _sobel_filters(self, img):
         Kx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], np.float32)
@@ -47,21 +41,20 @@ class CassetteCropper():
         
         return (G, theta)
 
-    def crop(self):
-        cassette = self.crop_translation_only()
-        if cassette is not None:
-            return cassette
-        # if didn't find with first method continue with registration
+    def crop(self, use_registration=False):
+        if not use_registration:
+            cassette = self.crop_translation_only()
+            if cassette is not None:
+                return cassette
+        '''
+        if we didn't find the cassette with first method 
+        or use_registration=true 
+        continue with registration
+        '''
         print('preprocessing sample image')
         sample_closed =  self._create_closed_image(self.sample)
         template_path = '/tmp/template_closed.png'
-        if os.path.isfile(template_path):
-            template_closed = imageio.imread(template_path).astype(np.bool)
-        else:
-            print('preprocessing template image (only once)')
-            template_closed = self._create_closed_image(self.template)
-            imageio.imwrite(template_path, template_closed.astype(np.uint8) * 255)
-        # sample_registered = self._register_to_template(template_closed, sample_closed)
+        template_closed = imageio.imread(template_path).astype(np.bool)
         sample_registered = self._register_to_template_2(template_closed, sample_closed)
         return self._crop_to_box(sample_registered)
         
@@ -163,60 +156,11 @@ class CassetteCropper():
         #     plt.show()
         return self._transform_sample_2(result)
 
-    # def _register_to_template(self, template_closed, sample_closed):
-    #     fixed = sitk.GetImageFromArray(template_closed.astype(np.float) * 255)
-    #     fixed = sitk.DiscreteGaussian(fixed, 2.0)
-
-    #     moving = sitk.GetImageFromArray(sample_closed.astype(np.float) * 255)
-    #     moving = sitk.DiscreteGaussian(moving, 2.0)
-        
-    #     R = sitk.ImageRegistrationMethod()
-    #     R.SetMetricAsMeanSquares()
-    #     sample_per_axis=100
-    #     tx = sitk.Euler2DTransform()
-    #     # Set the number of samples (radius) in each dimension, with a
-    #     # default step size of 1.0
-    #     R.SetOptimizerAsExhaustive([sample_per_axis//2,0,0])
-    #     # Utilize the scale to set the step size for each dimension
-    #     R.SetOptimizerScales([2.0*np.pi/sample_per_axis, 1.0,1.0])
-
-    #     # Initialize the transform with a translation and the center of
-    #     # rotation from the moments of intensity.
-    #     tx = sitk.CenteredTransformInitializer(fixed, moving, tx)
-    #     R.SetInitialTransform(tx)
-    #     R.SetInterpolator(sitk.sitkLinear)
-    #     R.AddCommand( sitk.sitkIterationEvent, lambda: self._command_iteration(R) )
-    #     outTx = R.Execute(fixed, moving)
-    #     return self._transform_sample(outTx, fixed)
-
     def _transform_sample_2(self, result):
         sample_registered = ird.imreg.transform_img(self.sample, scale=result['scale'], angle=result['angle'], tvec=result['tvec'])
         sample_registered = sample_registered.astype(np.uint8)
-        # if os.environ.get("IMSHOW", "yes") == "yes":
-        #     import matplotlib.pyplot as plt
-        #     ird.imshow(self.template, self.sample, sample_registered)
-        #     plt.show()
+
         return sample_registered
-
-    # def _transform_sample(self, outTx, fixed):
-    #     moving = sitk.GetImageFromArray(self.sample)
-    #     moving = sitk.Normalize(moving)
-    #     moving = sitk.DiscreteGaussian(moving, 2.0)
-    #     resampler = sitk.ResampleImageFilter()
-    #     resampler.SetReferenceImage(fixed)
-    #     resampler.SetInterpolator(sitk.sitkLinear)
-    #     resampler.SetDefaultPixelValue(1)
-    #     resampler.SetTransform(outTx)
-    #     out = resampler.Execute(moving)
-    #     simg2 = sitk.Cast(sitk.RescaleIntensity(out), sitk.sitkUInt8)
-    #     sample_registered = sitk.GetArrayFromImage(simg2)
-
-    #     # simg1 = sitk.Cast(sitk.RescaleIntensity(fixed), sitk.sitkUInt8)
-    #     # simg2 = sitk.Cast(sitk.RescaleIntensity(out), sitk.sitkUInt8)        
-    #     # cimg = sitk.Compose(simg1, simg2, simg1//2.+simg2//2.)
-    #     # plt.imshow(sitk.GetArrayFromImage(cimg))
-    #     # plt.show()
-    #     return sample_registered
 
     def _crop_to_box(self, sample_registered):
         # cropping mask based on the template image

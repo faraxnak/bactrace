@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image, ImageTk
 from argparse import ArgumentParser
+import argparse
 import os.path
 import sys
 import csv
-import datetime
-
+import datetime, shutil
 from CassetteCropper import CassetteCropper
 from MarkerReader import MarkerReader
 
@@ -115,8 +115,8 @@ def process_images(samples, filenames):
     markerReader = MarkerReader()
     for sample, filename in zip(samples, filenames):    
         print('started processing {}'.format(filename))
-        cropper.set_images(sample, template)
-        cropped_sample = cropper.crop()
+        cropper.set_images(sample)
+        cropped_sample = cropper.crop(use_registration=args.use_registration)
         cropped_images.append(cropped_sample)    
         marked_image, markers_data, markers_p_value = markerReader.read_markers(cropped_sample)
         marked_images.append(marked_image)
@@ -171,42 +171,6 @@ def save_resutls(cropped_images, marked_images, markers_data_list,
         image.save(marked_folder + filename)
 
 
-parser = ArgumentParser()
-parser.add_argument("-s", "--sample", dest="sample_path",
-                    help="sample path", metavar="FILE", default='/tmp/sample.tiff')
-parser.add_argument("-d", "--directory", dest = "sample_dir",
-                    help="sample directory", metavar="DIR", default='/tmp/samples/')
-parser.add_argument("-t", "--template", dest="template_path",
-                    help="template path", metavar="FILE", default='/tmp/template.tiff')
-args = parser.parse_args()
-
-
-""" 
-template image is: 
-4_Pos_low Inflammation.tiff
-"""
-
-if os.path.isdir(args.sample_dir):
-    reading_from_folder = True
-    if not args.sample_dir.endswith('/'):
-        args.sample_dir += "/"
-elif os.path.isfile(args.sample_path):
-    reading_from_folder = False
-else:
-    sys.exit('Can not find the sample image or sample directory')
-
-if os.path.isfile(args.template_path) == False:
-    sys.exit('Can not find the template image')
-# if os.path.isfile(args.sample_path) == False:
-#     sys.exit('Can not find the source image')
-
-template = Image.open(args.template_path).convert('L')
-
-
-
-samples, filenames, source_pathes = readImages()
-cropped_images, marked_images, markers_data_list, markers_p_value_list = process_images(samples, filenames)
-
 def create_folders():
     results_folder = "/tmp/results/"
     if not os.path.isdir(results_folder):
@@ -225,18 +189,6 @@ def create_folders():
 
     return current_run_folder, input_folder, cropped_folder, marked_folder
 
-current_run_folder, input_folder, cropped_folder, marked_folder = create_folders() 
-save_resutls(cropped_images, marked_images, markers_data_list, 
-            markers_p_value_list, filenames, source_pathes,
-            input_folder, cropped_folder, marked_folder, current_run_folder)
-
-"""
-Showing the result
-"""
-viewer = ResultViewer()
-window = viewer.create_window(filenames[-1], cropped_images[-1], 
-                        marked_images[-1], markers_data_list[-1], markers_p_value_list[-1])
-
 def check():    
     samples, filenames, source_pathes = readImages(can_be_empty=True)    
     if len(samples) > 0:
@@ -253,13 +205,77 @@ def check():
 def ctrl_c_check():
     window.after(10, ctrl_c_check)
 
-window.after(int(1e4), check)
-window.after(10, ctrl_c_check)
-try:
-    window.mainloop()
-except KeyboardInterrupt:
-        print('\nClosing the program')
-        try:
-            sys.exit(0)
-        except SystemExit:
-            os._exit(0)
+def str2bool(v):
+    if isinstance(v, bool):
+       return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+
+if __name__ == "__main__":
+    """
+    read arguments
+    """
+    parser = ArgumentParser()
+    parser.add_argument("-s", "--sample", dest="sample_path",
+                        help="sample path", metavar="FILE", default='/tmp/sample.tiff')
+    parser.add_argument("-d", "--directory", dest = "sample_dir",
+                        help="sample directory", metavar="DIR", default='/tmp/samples/')
+    parser.add_argument("-t", "--template", dest="template_path",
+                        help="template path", metavar="FILE", 
+                        default= os.path.dirname(os.path.abspath(__file__)) + '/template_closed.png')
+    parser.add_argument('--use_registration', type=str2bool,  default=False,
+                        help='Only use registraton method for cropping the cassette (default: False)')
+    args = parser.parse_args()
+
+    """ 
+    check input arguments
+    """
+
+    if os.path.isdir(args.sample_dir):
+        reading_from_folder = True
+        if not args.sample_dir.endswith('/'):
+            args.sample_dir += "/"
+    elif os.path.isfile(args.sample_path):
+        reading_from_folder = False
+    else:
+        sys.exit('Can not find the sample image or sample directory')
+
+    if os.path.isfile(args.template_path):
+        shutil.copy(args.template_path, '/tmp/template_closed.png')
+    else:
+        sys.exit('Can not find the template image')
+
+    samples, filenames, source_pathes = readImages()
+    cropped_images, marked_images, markers_data_list, markers_p_value_list = process_images(samples, filenames)
+
+
+
+    current_run_folder, input_folder, cropped_folder, marked_folder = create_folders() 
+    save_resutls(cropped_images, marked_images, markers_data_list, 
+                markers_p_value_list, filenames, source_pathes,
+                input_folder, cropped_folder, marked_folder, current_run_folder)
+
+    """
+    Showing the result
+    """
+    viewer = ResultViewer()
+    window = viewer.create_window(filenames[-1], cropped_images[-1], 
+                            marked_images[-1], markers_data_list[-1], markers_p_value_list[-1])
+
+    window.after(int(1e4), check)
+    window.after(10, ctrl_c_check)
+    try:
+        window.mainloop()
+    except KeyboardInterrupt:
+            print('\nClosing the program')
+            try:
+                sys.exit(0)
+            except SystemExit:
+                os._exit(0)
+    
